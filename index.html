@@ -1,0 +1,624 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Matrix Scientific Calculator — Turquoise</title>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --green-bright: #00ff41;
+    --green-mid:    #00cc33;
+    --green-glow:   #39ff14;
+    --tq:           #00D4B4;
+    --tq-hot:       #00F5C8;
+    --tq-vivid:     #00FFDA;
+    --tq-mid:       #00B89A;
+    --tq-dark:      #007A65;
+    --black:        #0D0D0D;
+    --mint:         #A8FFCF;   /* mint green — button text & screen result */
+  }
+
+  body {
+    background: #010C0A;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Share Tech Mono', monospace;
+    overflow: hidden;
+    position: relative;
+  }
+
+  #matrix-canvas {
+    position: fixed; top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 0; pointer-events: none;
+  }
+
+  .calc-wrapper {
+    position: relative; z-index: 10;
+    display: flex; flex-direction: column;
+    align-items: center; gap: 14px;
+  }
+
+  .calc-title {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900; font-size: 1.1rem;
+    letter-spacing: 0.42em; color: var(--green-bright);
+    text-shadow: 0 0 8px var(--green-glow), 0 0 28px rgba(0,255,65,0.65), 0 0 70px rgba(0,255,65,0.28);
+    text-transform: uppercase;
+  }
+
+  .footer-text {
+    font-size: 0.56rem; color: var(--green-mid);
+    letter-spacing: 0.32em; text-transform: uppercase;
+    text-shadow: 0 0 8px rgba(0,255,65,0.45);
+  }
+
+  /* ══ CALCULATOR SHELL — pure glowing white ══ */
+  .calculator {
+    background: #ffffff;
+    border: 2.5px solid rgba(0,212,180,0.80);
+    border-radius: 22px;
+    padding: 22px 20px 24px;
+    width: 428px;
+    position: relative;
+    box-shadow:
+      inset 0 0 80px rgba(255,255,255,1),
+      inset 0 4px 20px rgba(230,255,250,0.8),
+      0 0 0 1px    rgba(0,245,200,0.30),
+      0 0 30px     rgba(0,212,180,0.55),
+      0 0 70px     rgba(0,212,180,0.28),
+      0 0 140px    rgba(0,180,160,0.14),
+      0 0 200px    rgba(0,0,0,0.82);
+    animation: pulse-ring 4s ease-in-out infinite;
+  }
+
+  /* shimmer sweep on top rim */
+  .calculator::before {
+    content: '';
+    position: absolute; top: 0; left: 8%; right: 8%;
+    height: 2.5px; border-radius: 2px;
+    background: linear-gradient(90deg,
+      transparent 0%,
+      rgba(0,245,200,0.80) 35%,
+      rgba(255,255,255,1)  50%,
+      rgba(0,245,200,0.80) 65%,
+      transparent 100%);
+    animation: shimmer-top 3.5s ease-in-out infinite;
+    filter: blur(0.5px); z-index: 5;
+  }
+
+  /* very faint scanlines — barely visible on white */
+  .calculator::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: repeating-linear-gradient(
+      0deg, transparent, transparent 3px,
+      rgba(0,180,155,0.018) 3px, rgba(0,180,155,0.018) 4px);
+    pointer-events: none; border-radius: 22px; z-index: 1;
+  }
+
+  @keyframes shimmer-top {
+    0%,100% { opacity:0.5; left:8%;  right:55%; }
+    50%     { opacity:1;   left:55%; right:8%;  }
+  }
+
+  /* ══ DISPLAY — pure white screen ══ */
+  .display {
+    background: #ffffff;
+    border: 2px solid var(--tq);
+    border-radius: 13px;
+    padding: 14px 16px 10px;
+    margin-bottom: 14px;
+    min-height: 100px;
+    display: flex; flex-direction: column;
+    justify-content: flex-end; align-items: flex-end;
+    position: relative; overflow: hidden;
+    box-shadow:
+      inset 0 0 30px rgba(0,245,200,0.06),
+      0 4px 20px rgba(0,0,0,0.14),
+      0 1px  5px rgba(0,0,0,0.10),
+      0 0   18px rgba(0,212,180,0.22);
+  }
+
+  /* turquoise accent bar at top of screen */
+  .display::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0;
+    height: 3px;
+    background: linear-gradient(90deg,
+      transparent, rgba(0,212,180,0.5) 20%,
+      var(--tq-hot) 50%, rgba(0,212,180,0.5) 80%, transparent);
+    filter: blur(0.4px);
+  }
+
+  .display::after {
+    content: '';
+    position: absolute; bottom: 0; left: 5%; right: 5%;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(0,212,180,0.18), transparent);
+  }
+
+  .display-mode {
+    font-size: 0.62rem; font-weight: 800;
+    color: var(--tq-dark); letter-spacing: 0.22em;
+    position: absolute; top: 9px; left: 13px;
+    text-transform: uppercase;
+  }
+
+  .display-shift {
+    font-size: 0.62rem; font-weight: 800;
+    color: var(--tq-dark); letter-spacing: 0.22em;
+    position: absolute; top: 9px; right: 13px;
+    text-transform: uppercase; opacity: 0;
+    transition: opacity 0.2s;
+  }
+  .display-shift.active {
+    opacity: 1; color: var(--tq);
+    text-shadow: 0 0 10px rgba(0,212,180,0.6);
+  }
+
+  /* expression / history line — dark turquoise on white */
+  .display-expr {
+    font-size: 0.74rem; color: #1A7A50;
+    letter-spacing: 0.05em; min-height: 17px;
+    text-align: right; max-width: 100%;
+    overflow: hidden; text-overflow: ellipsis;
+    white-space: nowrap; width: 100%;
+  }
+
+  /* ── MAIN RESULT — turquoise, bold, glowing ── */
+  .display-main {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 2.35rem; font-weight: 900;
+    color: var(--black);
+    text-shadow: none;
+    letter-spacing: 0.06em; line-height: 1.1;
+    transition: font-size 0.15s;
+    word-break: break-all; text-align: right;
+    max-width: 100%;
+    animation: flicker 7s infinite;
+  }
+  .display-main.small  { font-size: 1.55rem; }
+  .display-main.xsmall { font-size: 1.1rem;  }
+
+  /* ══ BUTTON GRID TRAY — pure white ══ */
+  .btn-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 8px;
+    position: relative; z-index: 2;
+    background: #ffffff;
+    border-radius: 14px;
+    padding: 8px;
+    box-shadow:
+      inset 0 3px 14px rgba(0,0,0,0.07),
+      inset 0 0 0 1.5px rgba(0,212,180,0.18);
+  }
+
+  /* ══ BASE BUTTON — solid turquoise ══ */
+  button {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 0.85rem; font-weight: 900;
+    letter-spacing: 0.04em;
+    /* MUSEO BLACK — near-black text */
+    color: var(--black);
+    text-shadow: none;
+    background: linear-gradient(160deg, var(--tq-hot) 0%, var(--tq) 50%, var(--tq-mid) 100%);
+    border: 1.5px solid rgba(0,180,160,0.50);
+    border-radius: 10px;
+    padding: 0; height: 54px;
+    cursor: pointer;
+    transition: all 0.12s ease;
+    position: relative; overflow: hidden;
+    user-select: none;
+    display: flex; align-items: center;
+    justify-content: center; flex-direction: column; gap: 2px;
+    /* top specular highlight — glossy turquoise */
+    box-shadow:
+      inset 0 1.5px 0 rgba(255,255,255,0.55),
+      inset 0 -2px  0 rgba(0,120,105,0.30),
+      0 3px  8px rgba(0,0,0,0.18),
+      0 1px  3px rgba(0,0,0,0.12);
+  }
+
+  /* gloss sheen overlay on every button */
+  button::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0; height: 50%;
+    border-radius: 10px 10px 50% 50%;
+    background: linear-gradient(180deg,
+      rgba(255,255,255,0.38) 0%,
+      rgba(255,255,255,0.04) 100%);
+    pointer-events: none; z-index: 1;
+  }
+
+  /* hover shimmer */
+  button::after {
+    content: '';
+    position: absolute; inset: 0;
+    background: radial-gradient(ellipse at 50% 0%,
+      rgba(255,255,255,0.30) 0%, transparent 65%);
+    opacity: 0; transition: opacity 0.12s; z-index: 2;
+  }
+
+  button:hover {
+    background: linear-gradient(160deg, var(--tq-vivid) 0%, var(--tq-hot) 50%, var(--tq) 100%);
+    border-color: rgba(0,212,180,0.80);
+    transform: translateY(-2px);
+    box-shadow:
+      inset 0 1.5px 0 rgba(255,255,255,0.65),
+      inset 0 -2px  0 rgba(0,120,105,0.25),
+      0 6px 16px rgba(0,212,180,0.35),
+      0 2px  6px rgba(0,0,0,0.15);
+  }
+  button:hover::after { opacity: 1; }
+
+  button:active {
+    transform: translateY(0) scale(0.96);
+    box-shadow:
+      inset 0 3px 8px rgba(0,0,0,0.20),
+      0 0 20px rgba(0,212,180,0.40);
+  }
+
+  /* ── SPECIAL / FUNCTION BUTTONS — slightly deeper turquoise ── */
+  button.special {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.76rem; font-weight: 700;
+    color: var(--black);
+    background: linear-gradient(160deg, var(--tq) 0%, var(--tq-mid) 100%);
+    border-color: rgba(0,160,140,0.45);
+    box-shadow:
+      inset 0 1.5px 0 rgba(255,255,255,0.45),
+      inset 0 -2px  0 rgba(0,100,88,0.30),
+      0 3px 8px rgba(0,0,0,0.15),
+      0 1px 3px rgba(0,0,0,0.10);
+  }
+  button.special:hover {
+    background: linear-gradient(160deg, var(--tq-hot) 0%, var(--tq) 100%);
+  }
+
+  /* ── OPERATOR BUTTONS — richer, deeper turquoise ── */
+  button.operator {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.20rem; font-weight: 900;
+    color: var(--black);
+    background: linear-gradient(160deg, #00E8C8 0%, #00BFA8 50%, #009E8C 100%);
+    border-color: rgba(0,150,130,0.55);
+    box-shadow:
+      inset 0 1.5px 0 rgba(255,255,255,0.50),
+      inset 0 -2px  0 rgba(0,90,78,0.35),
+      0 4px 12px rgba(0,0,0,0.20),
+      0 0   14px rgba(0,180,160,0.22);
+  }
+  button.operator:hover {
+    background: linear-gradient(160deg, var(--tq-hot) 0%, #00D4B4 50%, #00B89A 100%);
+  }
+
+  /* ── EQUALS BUTTON — brightest, most vivid turquoise ── */
+  button.equals {
+    font-family: 'Orbitron', sans-serif;
+    font-size: 1.30rem; font-weight: 900;
+    color: var(--black);
+    background: linear-gradient(160deg, var(--tq-vivid) 0%, var(--tq-hot) 40%, var(--tq) 100%);
+    grid-column: span 2;
+    border: 2px solid rgba(0,230,205,0.75);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.60),
+      inset 0 -3px 0 rgba(0,100,88,0.30),
+      0 0 22px rgba(0,245,200,0.60),
+      0 0 55px rgba(0,212,180,0.28),
+      0 5px 16px rgba(0,0,0,0.22);
+    transition: all 0.12s ease;
+  }
+  button.equals:hover {
+    background: linear-gradient(160deg, #ffffff 0%, var(--tq-vivid) 40%, var(--tq-hot) 100%);
+    box-shadow:
+      inset 0 2px 0 rgba(255,255,255,0.75),
+      0 0 36px rgba(0,255,218,0.75),
+      0 0 75px rgba(0,245,200,0.35),
+      0 7px 20px rgba(0,0,0,0.20);
+    transform: translateY(-2px);
+  }
+  button.equals:active {
+    transform: translateY(0) scale(0.96);
+    box-shadow: inset 0 3px 10px rgba(0,0,0,0.22), 0 0 36px rgba(0,255,218,0.55);
+  }
+
+  /* ── CLEAR / BACK — red accent, still black text ── */
+  button.clear {
+    font-family: 'Orbitron', sans-serif;
+    font-weight: 900;
+    color: #CC1C1C;
+    background: linear-gradient(160deg, #ffe5e5 0%, #ffd0d0 100%);
+    border-color: rgba(200,60,60,0.40);
+    text-shadow: 0 0 4px rgba(180,0,0,0.22);
+    box-shadow:
+      inset 0 1.5px 0 rgba(255,255,255,0.80),
+      inset 0 -2px  0 rgba(180,0,0,0.15),
+      0 3px 8px rgba(0,0,0,0.14);
+  }
+  button.clear:hover {
+    background: linear-gradient(160deg, #ffd4d4 0%, #ffbbbb 100%);
+    border-color: rgba(220,60,60,0.65);
+    box-shadow:
+      inset 0 1.5px 0 rgba(255,255,255,0.85),
+      0 0 18px rgba(220,60,60,0.28),
+      0 4px 10px rgba(0,0,0,0.16);
+    transform: translateY(-2px);
+    color: #AA0000;
+  }
+
+  /* ── SHIFT BUTTON ── */
+  button.shift-btn {
+    font-family: 'Orbitron', sans-serif; font-weight: 900;
+    color: var(--black);
+    background: linear-gradient(160deg, var(--tq-hot) 0%, var(--tq-mid) 100%);
+    border-color: rgba(0,180,160,0.55);
+    box-shadow:
+      inset 0 1.5px 0 rgba(255,255,255,0.50),
+      inset 0 -2px  0 rgba(0,110,95,0.30),
+      0 3px 8px rgba(0,0,0,0.16);
+  }
+  button.shift-btn.active {
+    background: linear-gradient(160deg, #ffffff 0%, var(--tq-vivid) 100%);
+    border-color: var(--tq-vivid);
+    color: var(--black);
+    box-shadow:
+      inset 0 1.5px 0 rgba(255,255,255,0.90),
+      0 0 24px rgba(0,255,218,0.65),
+      0 0 55px rgba(0,245,200,0.30);
+  }
+
+  /* ── SUB-LABELS — dark teal, readable on turquoise ── */
+  .sub-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 0.49rem; font-weight: 400;
+    color: rgba(0, 80, 50, 0.70);
+    letter-spacing: 0.03em; line-height: 1; text-shadow: none;
+  }
+
+  /* ══ ANIMATIONS ══ */
+  @keyframes shake {
+    0%,100% { transform: translateX(0); }
+    20%,60% { transform: translateX(-7px); }
+    40%,80% { transform: translateX(7px); }
+  }
+  .shake { animation: shake 0.4s ease; }
+
+  @keyframes flicker {
+    0%,100% { opacity:1; } 91% { opacity:1; }
+    92% { opacity:0.60; } 93% { opacity:1; }
+    96% { opacity:0.78; } 97% { opacity:1; }
+  }
+
+  @keyframes pulse-ring {
+    0%,100% { box-shadow:
+      inset 0 0 80px rgba(255,255,255,1),
+      inset 0 4px 20px rgba(230,255,250,0.8),
+      0 0 0 1px rgba(0,245,200,0.30),
+      0 0 30px rgba(0,212,180,0.55),
+      0 0 70px rgba(0,212,180,0.28),
+      0 0 140px rgba(0,180,160,0.14),
+      0 0 200px rgba(0,0,0,0.82); }
+    50% { box-shadow:
+      inset 0 0 80px rgba(255,255,255,1),
+      inset 0 4px 20px rgba(230,255,250,0.8),
+      0 0 0 1px rgba(0,245,200,0.50),
+      0 0 45px rgba(0,212,180,0.75),
+      0 0 95px rgba(0,212,180,0.40),
+      0 0 170px rgba(0,180,160,0.22),
+      0 0 220px rgba(0,0,0,0.78); }
+  }
+</style>
+</head>
+<body>
+
+<canvas id="matrix-canvas"></canvas>
+
+<div class="calc-wrapper">
+  <div class="calc-title">▸ MATRIX CALC ◂</div>
+
+  <div class="calculator">
+    <div class="display" id="display">
+      <span class="display-mode"  id="mode-label">DEG</span>
+      <span class="display-shift" id="shift-label">SHIFT</span>
+      <div class="display-expr"   id="expr-display"></div>
+      <div class="display-main"   id="main-display">0</div>
+    </div>
+
+    <div class="btn-grid">
+      <button class="shift-btn" id="shift-btn" onclick="toggleShift()">SHIFT<span class="sub-label">2nd</span></button>
+      <button class="special"   onclick="toggleAngleMode()"><span id="angle-mode-label">DEG</span><span class="sub-label">RAD</span></button>
+      <button class="special"   onclick="insertConst('PI')">π<span class="sub-label">3.14159</span></button>
+      <button class="special"   onclick="insertConst('E')">e<span class="sub-label">2.71828</span></button>
+      <button class="clear"     onclick="clearAll()">AC</button>
+
+      <button class="special" onclick="applyFunc('sin')">sin<span class="sub-label">sin⁻¹</span></button>
+      <button class="special" onclick="applyFunc('cos')">cos<span class="sub-label">cos⁻¹</span></button>
+      <button class="special" onclick="applyFunc('tan')">tan<span class="sub-label">tan⁻¹</span></button>
+      <button class="special" onclick="applyFunc('log')">log<span class="sub-label">10^x</span></button>
+      <button class="special" onclick="applyFunc('ln')">ln<span class="sub-label">e^x</span></button>
+
+      <button class="special" onclick="applyFunc('sqrt')">√x<span class="sub-label">x²</span></button>
+      <button class="special" onclick="applyFunc('cbrt')">∛x<span class="sub-label">x³</span></button>
+      <button class="special" onclick="appendOp('^')">xʸ<span class="sub-label">y√x</span></button>
+      <button class="special" onclick="applyFunc('abs')">|x|<span class="sub-label">n!</span></button>
+      <button class="special" onclick="applyFunc('1/x')">1/x<span class="sub-label">x%</span></button>
+
+      <button class="special" onclick="appendChar('(')">(<span class="sub-label">STO</span></button>
+      <button class="special" onclick="appendChar(')')">)<span class="sub-label">RCL</span></button>
+      <button class="special" onclick="memoryOp('MS')">MS<span class="sub-label">M+</span></button>
+      <button class="special" onclick="memoryOp('MR')">MR<span class="sub-label">MC</span></button>
+      <button class="clear"   onclick="deleteLast()">⌫</button>
+
+      <button onclick="appendChar('7')">7</button>
+      <button onclick="appendChar('8')">8</button>
+      <button onclick="appendChar('9')">9</button>
+      <button class="operator" onclick="appendOp('×')">×</button>
+      <button class="operator" onclick="appendOp('÷')">÷</button>
+
+      <button onclick="appendChar('4')">4</button>
+      <button onclick="appendChar('5')">5</button>
+      <button onclick="appendChar('6')">6</button>
+      <button class="operator" onclick="appendOp('+')">+</button>
+      <button class="operator" onclick="appendOp('−')">−</button>
+
+      <button onclick="appendChar('1')">1</button>
+      <button onclick="appendChar('2')">2</button>
+      <button onclick="appendChar('3')">3</button>
+      <button class="special" onclick="applyFunc('floor')">⌊x⌋<span class="sub-label">⌈x⌉</span></button>
+      <button class="special" onclick="applyFunc('exp10')">10^x<span class="sub-label">e^x</span></button>
+
+      <button onclick="appendChar('0')">0</button>
+      <button onclick="appendChar('.')">.</button>
+      <button class="special" onclick="negate()">+/−</button>
+      <button class="equals"  onclick="calculate()">=</button>
+    </div>
+  </div>
+
+  <div class="footer-text">SCI-CALC v2.0 ∙ MATRIX EDITION — TURQUOISE</div>
+</div>
+
+<script>
+/* ══ MATRIX RAIN ══ */
+(function(){
+  const cv=document.getElementById('matrix-canvas'), cx=cv.getContext('2d');
+  let cols,drops;
+  const ch='0123456789アイウエオカキクケコサシスセソタチツテトナニヌネノハヒフヘホマミムメモヤユヨラリルレロワヲン+-×÷=∑∫√πΩΔ';
+  function init(){
+    cv.width=innerWidth; cv.height=innerHeight;
+    cols=Math.floor(cv.width/15);
+    drops=Array.from({length:cols},()=>Math.random()*-120);
+  }
+  function draw(){
+    cx.fillStyle='rgba(0,4,0,0.052)'; cx.fillRect(0,0,cv.width,cv.height);
+    for(let i=0;i<drops.length;i++){
+      const c=ch[Math.floor(Math.random()*ch.length)], y=drops[i]*15, b=Math.random();
+      cx.shadowBlur=0;
+      if(b>0.97){cx.fillStyle='#fff';cx.shadowBlur=18;cx.shadowColor='#00ff41';}
+      else if(b>0.88){cx.fillStyle='#00ff41';cx.shadowBlur=9;cx.shadowColor='#00ff41';}
+      else if(b>0.60){cx.fillStyle='#00cc33';}
+      else{cx.fillStyle='#007a20';}
+      cx.font='bold 15px "Share Tech Mono",monospace';
+      cx.fillText(c,i*15,y); cx.shadowBlur=0;
+      if(y>cv.height&&Math.random()>0.974)drops[i]=0;
+      drops[i]+=0.52;
+    }
+  }
+  init(); setInterval(draw,38); addEventListener('resize',init);
+})();
+
+/* ══ CALCULATOR ENGINE ══ */
+let expression='',lastResult=null,shiftActive=false,
+    angleMode='DEG',memory=0,justCalculated=false;
+
+const MD=document.getElementById('main-display'),
+      ED=document.getElementById('expr-display'),
+      SL=document.getElementById('shift-label'),
+      ML=document.getElementById('mode-label'),
+      AB=document.getElementById('angle-mode-label'),
+      SB=document.getElementById('shift-btn');
+
+function updateDisplay(v){
+  const s=String(v); MD.className='display-main';
+  if(s.length>14)MD.classList.add('xsmall');
+  else if(s.length>10)MD.classList.add('small');
+  MD.textContent=s||'0'; ED.textContent=expression;
+}
+function toggleShift(){shiftActive=!shiftActive;SL.classList.toggle('active',shiftActive);SB.classList.toggle('active',shiftActive);}
+function toggleAngleMode(){angleMode=angleMode==='DEG'?'RAD':'DEG';ML.textContent=AB.textContent=angleMode;}
+function toRad(x){return angleMode==='DEG'?x*Math.PI/180:x;}
+function fromRad(x){return angleMode==='DEG'?x*180/Math.PI:x;}
+function appendChar(c){
+  if(justCalculated&&!isNaN(c)&&c!=='.'){expression='';justCalculated=false;}
+  else if(justCalculated)justCalculated=false;
+  expression+=c;updateDisplay(expression);
+}
+function appendOp(o){justCalculated=false;if(!expression&&lastResult!==null)expression=String(lastResult);expression+=o;updateDisplay(expression);}
+function insertConst(c){justCalculated=false;expression+=(c==='PI'?'π':'e');updateDisplay(expression);}
+function negate(){if(!expression||expression==='0')return;expression=expression.startsWith('−')?expression.slice(1):'−'+expression;updateDisplay(expression);}
+function deleteLast(){justCalculated=false;expression=expression.slice(0,-1);updateDisplay(expression||'0');}
+function clearAll(){expression='';lastResult=null;justCalculated=false;updateDisplay('0');ED.textContent='';}
+function factorial(n){n=Math.floor(n);if(n<0)return NaN;let r=1;for(let i=2;i<=n;i++)r*=i;return r;}
+function applyFunc(fn){
+  if(shiftActive){
+    const s={sin:'asin',cos:'acos',tan:'atan',log:'pow10',ln:'exp',sqrt:'sq',cbrt:'cube',abs:'fact','1/x':'pct',floor:'ceil'};
+    fn=s[fn]||fn;toggleShift();
+  }
+  const val=parseFloat(expression)||lastResult||0;
+  let r;
+  switch(fn){
+    case 'sin':r=Math.sin(toRad(val));break; case 'cos':r=Math.cos(toRad(val));break;
+    case 'tan':r=Math.tan(toRad(val));break; case 'asin':r=fromRad(Math.asin(val));break;
+    case 'acos':r=fromRad(Math.acos(val));break; case 'atan':r=fromRad(Math.atan(val));break;
+    case 'log':r=Math.log10(val);break; case 'ln':r=Math.log(val);break;
+    case 'pow10':r=Math.pow(10,val);break; case 'exp':r=Math.exp(val);break;
+    case 'sqrt':r=Math.sqrt(val);break; case 'cbrt':r=Math.cbrt(val);break;
+    case 'sq':r=val*val;break; case 'cube':r=val*val*val;break;
+    case 'abs':r=Math.abs(val);break; case 'fact':r=factorial(val);break;
+    case '1/x':r=1/val;break; case 'pct':r=val/100;break;
+    case 'floor':r=Math.floor(val);break; case 'ceil':r=Math.ceil(val);break;
+    case 'exp10':r=Math.pow(10,val);break; default:r=val;
+  }
+  r=+r.toPrecision(12);
+  ED.textContent=`${fn}(${val}) =`;
+  expression=String(r);lastResult=r;justCalculated=true;updateDisplay(r);
+}
+function memoryOp(op){
+  if(shiftActive){const s={MS:'Madd',MR:'MC'};op=s[op]||op;toggleShift();}
+  const val=parseFloat(expression)||lastResult||0;
+  switch(op){
+    case 'MS':memory=val;showFlash('M SAVED');break;
+    case 'MR':expression=String(memory);updateDisplay(memory);break;
+    case 'MC':memory=0;showFlash('M CLEARED');break;
+    case 'Madd':memory+=val;showFlash('M+ = '+memory);break;
+  }
+}
+function showFlash(msg){const o=ED.textContent;ED.textContent='▸ '+msg+' ◂';setTimeout(()=>{ED.textContent=o;},1300);}
+function parseExpr(e){
+  return e.replace(/π/g,'(Math.PI)').replace(/\be\b/g,'(Math.E)')
+          .replace(/×/g,'*').replace(/÷/g,'/').replace(/−/g,'-').replace(/\^/g,'**')
+          .replace(/(\d)([\(π])/g,'$1*$2').replace(/([\)π])(\d)/g,'$1*$2').replace(/([\)])([\(])/g,'$1*$2');
+}
+function calculate(){
+  if(!expression)return;
+  ED.textContent=expression+' =';
+  try{
+    let r=Function('"use strict";return('+parseExpr(expression)+')')();
+    if(!isFinite(r))throw new Error('∞'); if(isNaN(r))throw new Error('NaN');
+    r=+r.toPrecision(12);lastResult=r;expression=String(r);justCalculated=true;updateDisplay(r);
+  }catch(e){
+    const m=(e.message==='∞'||e.message==='NaN')?e.message:'ERROR';
+    MD.textContent=m; MD.classList.add('shake');
+    MD.style.color='#cc0000'; MD.style.textShadow='0 0 10px rgba(200,0,0,0.6)';
+    setTimeout(()=>{MD.classList.remove('shake');MD.style.color=MD.style.textShadow='';expression='';updateDisplay('0');},1300);
+  }
+}
+document.addEventListener('keydown',e=>{
+  if(e.key>='0'&&e.key<='9')appendChar(e.key);
+  else if(e.key==='.')appendChar('.');
+  else if(e.key==='+')appendOp('+');
+  else if(e.key==='-')appendOp('−');
+  else if(e.key==='*')appendOp('×');
+  else if(e.key==='/'){e.preventDefault();appendOp('÷');}
+  else if(e.key==='^')appendOp('^');
+  else if(e.key==='(')appendChar('(');
+  else if(e.key===')')appendChar(')');
+  else if(e.key==='Enter'||e.key==='=')calculate();
+  else if(e.key==='Backspace')deleteLast();
+  else if(e.key==='Escape')clearAll();
+  else if(e.key==='s')applyFunc('sin');
+  else if(e.key==='c')applyFunc('cos');
+  else if(e.key==='t')applyFunc('tan');
+  else if(e.key==='l')applyFunc('log');
+  else if(e.key==='r')applyFunc('sqrt');
+});
+</script>
+</body>
+</html>
